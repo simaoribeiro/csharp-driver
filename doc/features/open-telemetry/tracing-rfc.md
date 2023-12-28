@@ -1,4 +1,4 @@
-- Feature Name: Add OpenTelemetry Tracing
+- Feature Name: Add OpenTelemetry Traces
 - Start Date: 2023-12-27
 
 # Summary
@@ -13,7 +13,7 @@ This document describes the necessary steps to include OpenTelemetry tracing in 
 OpenTelemetry is the industry standard regarding telemetry data that aggregates logs, metrics, and traces. Specifically regarding traces, it allows the developers to understand the full "path" a request takes in the application and navigate through a microservice architecture.
 For the .NET ecosystem, there are available implementations regarding the export of telemetry data in client-side calls in some major database management systems, being them community lead efforts ([SqlClient](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/src/OpenTelemetry.Instrumentation.SqlClient), [MongoDB](https://github.com/jbogard/MongoDB.Driver.Core.Extensions.OpenTelemetry)), or native implementations ([Elasticsearch](https://github.com/elastic/elasticsearch-net/blob/main/src/Elastic.Clients.Elasticsearch/Client/ElasticsearchClient.cs#L183)).
 
-The inclusion of telemetry in the Cassandra C# driver allows the developers to have access to Cassandra operations when analyzing the requests that are handled in their systems when it includes Cassandra calls.
+Cassandra has a community developed package available in the [opentelemetry-dotnet-contrib](https://github.com/open-telemetry/opentelemetry-dotnet-contrib/tree/main/src/OpenTelemetry.Instrumentation.Cassandra) that exports metrics but not traces. This proposal to include traces in the native Cassandra C# driver will allow the developers to have access to database operations when analyzing the requests that are handled in their systems when it includes Cassandra calls.
 
 # Guide-level explanation
 [guide-level-explanation]: #guide-level-explanation
@@ -47,7 +47,7 @@ The spans can be correlated with each other and assembled into a trace using [co
 
 ### Span name
 
-[OpenTelemetry Trace Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/general/trace/) (at the time of this writing, it's on version 1.24.0) defines multi-purpose semantic conventions regarding tracing for different components and protocols (e.g.: Database, HTTP, Messaging, etc.)
+[OpenTelemetry Trace Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/general/trace/) (at the time of this writing, it's on version 1.24.0) defines multipurpose semantic conventions regarding tracing for different components and protocols (e.g.: Database, HTTP, Messaging, etc.)
 
 For C# driver, the focus is the [semantic conventions for database client calls](https://opentelemetry.io/docs/specs/semconv/database/database-spans/) for the generic database attributes, and the [semantic conventions for Cassandra](https://opentelemetry.io/docs/specs/semconv/database/cassandra/) for the specific Cassandra attributes.
 
@@ -80,9 +80,9 @@ This implementation includes, by default, the **required** attributes for Databa
 
 The OpenTelemetry implementation is included in the package `CassandraCSharpDriver.OpenTelemetry`.
 
-### Cluster Builder
+### Exporting Cassandra activity
 
-The extension method `AddOpenTelemetryInstrumentation()` is available in the cluster builder, so the traces can be exported on database operations.
+The extension method `AddOpenTelemetryInstrumentation()` is available in the cluster builder, so the activity can be exported for database operations:
 
 ```csharp
 var cluster = Cluster.Builder()
@@ -102,7 +102,7 @@ var cluster = Cluster.Builder()
     .Build();
 ```
 
-### Capture Cassandra activity
+### Capturing Cassandra activity
 
 When setting up the tracer provider, it is necessary to include the Cassandra source for the activity to be captured. The activity source name is available in the property `CassandraInstrumentation.ActivitySourceName` that is included in the `CassandraCSharpDriver.OpenTelemetry` package.
 
@@ -114,18 +114,6 @@ using var tracerProvider = Sdk.CreateTracerProviderBuilder()
  .AddConsoleExporter()
  .Build();
 ```
-
-
-Explain the proposal as if it was already included in the language and you were teaching it to another Rust programmer. That generally means:
-
-- Introducing new named concepts.
-- Explaining the feature largely in terms of examples.
-- Explaining how Rust programmers should *think* about the feature, and how it should impact the way they use Rust. It should explain the impact as concretely as possible.
-- If applicable, provide sample error messages, deprecation warnings, or migration guidance.
-- If applicable, describe the differences between teaching this to existing Rust programmers and new Rust programmers.
-- Discuss how this impacts the ability to read, understand, and maintain Rust code. Code is read and modified far more often than written; will the proposed feature make code easier to maintain?
-
-For implementation-oriented RFCs (e.g. for compiler internals), this section should focus on how compiler contributors should think about the change, and give examples of its concrete impact. For policy RFCs, this section should provide an example-driven introduction to the policy, and explain its impact in concrete terms.
 
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
@@ -161,21 +149,17 @@ Falar que o racional poderia ser
 # Prior art
 [prior-art]: #prior-art
 
-Incluir outros projetos de databases de OpenTelemetry .NET aqui e outros projetos de Cassandra noutras linguagens.
+As mentioned in [motivation](#motivation) section, there are other DBMS implementations regarding the export of telemetry data in client-side calls in the .NET ecosystem:
 
-Discuss prior art, both the good and the bad, in relation to this proposal.
-A few examples of what this can include are:
+- [SqlClient](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/src/OpenTelemetry.Instrumentation.SqlClient) (Community contribution)
+- [MongoDB](https://github.com/jbogard/MongoDB.Driver.Core.Extensions.OpenTelemetry) (Community contribution)
+- [Elasticsearch](https://github.com/elastic/elasticsearch-net/blob/main/src/Elastic.Clients.Elasticsearch/Client/ElasticsearchClient.cs#L183) (Native)
 
-- For language, library, cargo, tools, and compiler proposals: Does this feature exist in other programming languages and what experience have their community had?
-- For community proposals: Is this done by some other community and what were their experiences with it?
-- For other teams: What lessons can we learn from what other communities have done here?
-- Papers: Are there any published papers or great posts that discuss this? If you have some relevant papers to refer to, this can serve as a more detailed theoretical background.
+Cassandra also has client-side implementations in other languages in the form of contribution projects, as listed below:
 
-This section is intended to encourage you as an author to think about the lessons from other languages, provide readers of your RFC with a fuller picture.
-If there is no prior art, that is fine - your ideas are interesting to us whether they are brand new or if it is an adaptation from other languages.
-
-Note that while precedent set by other languages is some motivation, it does not on its own motivate an RFC.
-Please also take into consideration that rust sometimes intentionally diverges from common language features.
+- [Java](https://github.com/open-telemetry/opentelemetry-java-instrumentation/tree/main/instrumentation/cassandra)
+- [NodeJS](https://github.com/open-telemetry/opentelemetry-js-contrib/tree/main/plugins/node/opentelemetry-instrumentation-cassandra)
+- [Python](https://github.com/open-telemetry/opentelemetry-python-contrib/tree/main/instrumentation/opentelemetry-instrumentation-cassandra)
 
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
@@ -187,11 +171,17 @@ Please also take into consideration that rust sometimes intentionally diverges f
 
 ## Traces
 
+### Include missing Recommended attributes
+
 As referred in [semantic conventions section](#semantic-conventions), there are recommended attributes that are not included in this proposal that may be useful for the users of Cassandra telemetry and can be something to look at in the future iterations of this feature:
 
 - [Cassandra Call-level attributes](https://opentelemetry.io/docs/specs/semconv/database/cassandra/#call-level-attributes)
 - [Database Call-level attributes](https://opentelemetry.io/docs/specs/semconv/database/database-spans/#call-level-attributes)
 - [Database Connection-level attributes](https://opentelemetry.io/docs/specs/semconv/database/database-spans/#connection-level-attributes)
+
+### Include customization
+
+The implementation suggested in this document is based in SqlClient implementation regarding the attributes exposed and the inclusion of database statement as optional. However, the SqlClient implementation has other forms of customization that are not included in this document, specifically the option to [enrich](https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/src/OpenTelemetry.Instrumentation.SqlClient/README.md#enrich) the activity with additional information from the raw `SqlCommand` object (for Cassandra, possibly `IStatement`).
 
 ## Metrics
 
