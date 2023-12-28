@@ -37,8 +37,11 @@ The spans can be correlated with each other and assembled into a trace using [co
 
 #### Architecture
 
+![architecture](./system-architecture-example.png)
 
 #### Data visualization using Jaeger
+
+![jaeger](./system-architecture-trace-timeline.png)
 
 ## OpenTelemetry Semantic Conventions
 
