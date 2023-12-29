@@ -118,7 +118,30 @@ using var tracerProvider = Sdk.CreateTracerProviderBuilder()
 # Reference-level explanation
 [reference-level-explanation]: #reference-level-explanation
 
-Referenciar que este projeto usa .NET Standard 2.0
+## Cassandra.OpenTelemetry project
+
+### Dependencies and target frameworks
+
+Similar to the existent metrics feature, this functionality includes a project named `Cassandra.OpenTelemetry` that extends the core `Cassandra` project and will handle the spans'generation.\
+`Cassandra.OpenTelemetry` has a single dependency from the package `System.Diagnostics.DiagnosticSource` which has the lowest non-deprecated version as [`6.0.1`](https://www.nuget.org/packages/System.Diagnostics.DiagnosticSource/6.0.1#dependencies-body-tab). Using this version it is possible to target the same .NET frameworks as the `Cassandra.AppMetrics` project which are `netstandard2.0;net461`.
+
+**Note:** There is an alternative that uses `OpenTelemetry.Api` package to avoid code duplication, but that implies changing the minimal target framework from `net461` to `net462`. Such alternative and its drawbacks are mentioned in the section ["rationale and alternatives"](#using-opentelemetry-api-package).
+
+### 
+
+Proposed changes to the .NET targets (.NET Standard, .NET Framework, unified .NET) that will have to be made (if any) 
+
+New nuget dependencies
+
+Changes to the API of the driver
+
+Avoid breaking changes because we are not considering a new major release any time soon.
+
+Changes to dependencies and .NET targets should be avoided. If they can’t be avoided then we can think of some possibilities like having an interface on the main driver package and then having separate extension packages that implement that interface (we did this for the metrics feature, the App.Metrics based implementation is on a separate package on the same repo).
+
+We can also consider changing the .NET targets of the main package if they aren’t too drastic but we can have that discussion once we know for sure if we require a recent version of .NET for this work.
+
+Also we’re always happy to see community contributions like this. I’ll try my best to review and comment on the document and future PR in a timely fashion.
 
 This is the technical portion of the RFC. Explain the design in sufficient detail that:
 
@@ -136,20 +159,22 @@ Why should we *not* do this?
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
 
+## Using OpenTelemetry.Api package
+[using-opentelemetry-api-package]: #using-opentelemetry-api-package
 
-Falar que o racional poderia ser
-1) Incluir telemetria por padrão como acontece no ElasticSearch, ao invés de ser um package à parte
-2) Inclur traces no projeto de contrib que só tem métricas
+The OpenTelemetry repository for .NET describes [how to report Exceptions](https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/docs/trace/reporting-exceptions/README.md) in a trace. The [option 4](https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/docs/trace/reporting-exceptions/README.md#option-4---use-activityrecordexception) mentioned in the document is the preferred approach in the industry on how to record exceptions. It includes the method `RecordException()` that is available in the project `OpenTelemetry.Api` which, since version [`1.3.0`](https://www.nuget.org/packages/OpenTelemetry.Api/1.3.0), only supports the minimal version of `4.6.2` for .NET framework. Using this package in the most recent versions will imply the loss of support for .NET Framework `4.6.1`.
 
-- Why is this design the best in the space of possible designs?
-- What other designs have been considered and what is the rationale for not choosing them?
-- What is the impact of not doing this?
-- If this is a language proposal, could this be done in a library or macro instead? Does the proposed change make Rust code easier or harder to read, understand, and maintain?
+The method [`RecordException()`](https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/src/OpenTelemetry.Api/Trace/ActivityExtensions.cs#L81) is simple enough to be replicated, and can be included in the `Cassandra.OpenTelemetry` project. As a downside, that means the Cassandra project will need to keep up with the best practices on how to report exceptions for tracing, and include code duplication. As an upside, it is possible to target .NET Framework `4.6.1`, and the reference to `OpenTelemetry.Api` is not needed which also allows the Cassandra project to not have a possible deprecated dependency depending on the evolution of reference package.
+
+## Using OpenTelemetry.SemanticConventions package
+
+The [semantic conventions](https://opentelemetry.io/docs/specs/semconv/) are a fast evolving reference that "define a common set of (semantic) attributes which provide meaning to data when collecting, producing and consuming it.".\
+As it changes can be hard to follow, the .NET project includes a package named [`OpenTelemetry.SemanticConventions`](https://www.nuget.org/packages/OpenTelemetry.SemanticConventions/1.0.0-rc9.9) that maps the attributes defined in the conventions to a .NET project. Using this package will allow the Cassandra project to have its tracing attributes up-to-date to the conventions with less maintenance, however, as it's still marked as non-stable (current version is `1.0.0-rc9.9`), its inclusion is not included in this proposal.
 
 # Prior art
 [prior-art]: #prior-art
 
-As mentioned in [motivation](#motivation) section, there are other DBMS implementations regarding the export of telemetry data in client-side calls in the .NET ecosystem:
+As mentioned in ["motivation"](#motivation) section, there are other DBMS implementations regarding the export of telemetry data in client-side calls in the .NET ecosystem:
 
 - [SqlClient](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/src/OpenTelemetry.Instrumentation.SqlClient) (Community contribution)
 - [MongoDB](https://github.com/jbogard/MongoDB.Driver.Core.Extensions.OpenTelemetry) (Community contribution)
@@ -173,7 +198,7 @@ Cassandra also has client-side implementations in other languages in the form of
 
 ### Include missing Recommended attributes
 
-As referred in [semantic conventions section](#semantic-conventions), there are recommended attributes that are not included in this proposal that may be useful for the users of Cassandra telemetry and can be something to look at in the future iterations of this feature:
+As referred in ["semantic conventions section"](#semantic-conventions), there are recommended attributes that are not included in this proposal that may be useful for the users of Cassandra telemetry and can be something to look at in the future iterations of this feature:
 
 - [Cassandra Call-level attributes](https://opentelemetry.io/docs/specs/semconv/database/cassandra/#call-level-attributes)
 - [Database Call-level attributes](https://opentelemetry.io/docs/specs/semconv/database/database-spans/#call-level-attributes)
