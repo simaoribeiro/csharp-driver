@@ -350,7 +350,12 @@ _requestResultHandler = new TcsMetricsRequestResultHandler(_requestObserver, sta
 # Drawbacks
 [drawbacks]: #drawbacks
 
-Why should we *not* do this?
+Although the implementation suggested in this document tries to minimize changing the core package, the inclusion of new observers being called will increase the complexity and the performance of the driver.
+
+`TracesRequestObserver`, for now, doesn't have a use for the methods `OnRequestError` and `OnSpeculativeExecution` defined in the interface `IRequestObserver`. However, this can change in the future as the semantic conventions defines more attributes than the ones being included in this proposal, being some of them related to speculative execution.
+
+Another point that should be looked into is that the current observers can sometimes be metrics-focused which means that some implementations will have method definitions that are not being used. As an example, the `IObserverFactoryBuilder.Build` that is implemented by `TracerObserverFactoryBuilder` and `NullObserverFactoryBuilder` doesn't need the `IMetricsManager` instance that is passed as parameter.\
+The observer interfaces pose a possibility of disaggregation in a future version of the driver.
 
 # Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
