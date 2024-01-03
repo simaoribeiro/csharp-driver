@@ -20,7 +20,7 @@ Cassandra has a community developed package available in the [opentelemetry-dotn
 
 ## [Traces](https://opentelemetry.io/docs/concepts/signals/traces/)
 
-As mentioned in [motivation](#motivation), traces allows the developers to understand the full "path" a request takes in the application and navigate through a microservice architecture. Traces include [Spans](https://opentelemetry.io/docs/concepts/signals/traces/#spans) which are unit of works or operation in the ecosystem that include the following information:
+As mentioned in [*Motivation*](#motivation), traces allows the developers to understand the full "path" a request takes in the application and navigate through a microservice architecture. Traces include [Spans](https://opentelemetry.io/docs/concepts/signals/traces/#spans) which are unit of works or operation in the ecosystem that include the following information:
 
 - Name
 - Parent span ID (empty for root spans)

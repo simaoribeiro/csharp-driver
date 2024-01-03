@@ -1,1 +1,0 @@
-{"rule":"ENGLISH_WORD_REPEAT_BEGINNING_RULE","sentence":"^\\QAs an upside, it is possible to target .NET Framework \\E(?:Dummy|Ina|Jimmy-)[0-9]+$"}
