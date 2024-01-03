@@ -122,14 +122,14 @@ using var tracerProvider = Sdk.CreateTracerProviderBuilder()
 
 ### Dependencies and target frameworks
 
-Similar to the existent metrics feature, this functionality includes a project named `Cassandra.OpenTelemetry` that will extend the core `Cassandra` project and will handle the spans'generation.\
+Similar to the existent metrics feature, this functionality will include a project named `Cassandra.OpenTelemetry` that will extend the core `Cassandra` project and will handle the spans'generation.\
 `Cassandra.OpenTelemetry` has a single dependency from the package `System.Diagnostics.DiagnosticSource` which has the lowest non-deprecated version as [`6.0.1`](https://www.nuget.org/packages/System.Diagnostics.DiagnosticSource/6.0.1#dependencies-body-tab). Using this version it is possible to target the same .NET frameworks as the `Cassandra.AppMetrics` project which are `netstandard2.0;net461`.
 
-**Note:** There is an alternative that uses `OpenTelemetry.Api` package to avoid code duplication, but that implies changing the minimal target framework from `net461` to `net462`. Such alternative and its drawbacks are mentioned in the section ["rationale and alternatives"](#using-opentelemetry-api-package).
+**Note:** There is an alternative that uses `OpenTelemetry.Api` package to avoid code duplication, but that implies changing the minimal target framework from `net461` to `net462`. Such alternative and its drawbacks are mentioned in the section [*Rationale and Alternatives*](#rationale-and-alternatives).
 
 ### Extension methods
 
-The project includes a `Builder` extension method named `AddOpenTelemetryInstrumentation` that will instantiate a new class named `Trace` which will start and populate the `System.Diagnostics.Activity` class that will have the Cassandra telemetry information.
+The project will include a `Builder` extension method named `AddOpenTelemetryInstrumentation` that will instantiate a new class named `Trace` which will start and populate the `System.Diagnostics.Activity` class that will have the Cassandra telemetry information.
 This new class will implement an `IDriverTrace` interface that will be included in the Cassandra core, which is a similar implementation that already exists in the `Cassandra.AppMetrics` package.
 
 ## Cassandra core project
@@ -375,7 +375,7 @@ As it changes can be hard to follow, the .NET project includes a package named [
 # Prior art
 [prior-art]: #prior-art
 
-As mentioned in ["motivation"](#motivation) section, there are other DBMS implementations regarding the export of telemetry data in client-side calls in the .NET ecosystem:
+As mentioned in [*Motivation*](#motivation) section, there are other DBMS implementations regarding the export of telemetry data in client-side calls in the .NET ecosystem:
 
 - [SqlClient](https://github.com/open-telemetry/opentelemetry-dotnet/tree/main/src/OpenTelemetry.Instrumentation.SqlClient) (Community contribution)
 - [MongoDB](https://github.com/jbogard/MongoDB.Driver.Core.Extensions.OpenTelemetry) (Community contribution)
@@ -399,7 +399,7 @@ Cassandra also has client-side implementations in other languages in the form of
 
 ### Include missing Recommended attributes
 
-As referred in ["semantic conventions section"](#semantic-conventions), there are recommended attributes that are not included in this proposal that may be useful for the users of Cassandra telemetry and can be something to look at in the future iterations of this feature:
+As referred in [*semantic conventions* section](#semantic-conventions), there are recommended attributes that are not included in this proposal that may be useful for the users of Cassandra telemetry and can be something to look at in the future iterations of this feature:
 
 - [Cassandra Call-level attributes](https://opentelemetry.io/docs/specs/semconv/database/cassandra/#call-level-attributes)
 - [Database Call-level attributes](https://opentelemetry.io/docs/specs/semconv/database/database-spans/#call-level-attributes)
