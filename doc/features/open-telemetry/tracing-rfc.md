@@ -122,7 +122,7 @@ using var tracerProvider = Sdk.CreateTracerProviderBuilder()
 
 ### Dependencies and target frameworks
 
-Similar to the existent metrics feature, this functionality includes a project named `Cassandra.OpenTelemetry` that extends the core `Cassandra` project and will handle the spans'generation.\
+Similar to the existent metrics feature, this functionality includes a project named `Cassandra.OpenTelemetry` that will extend the core `Cassandra` project and will handle the spans'generation.\
 `Cassandra.OpenTelemetry` has a single dependency from the package `System.Diagnostics.DiagnosticSource` which has the lowest non-deprecated version as [`6.0.1`](https://www.nuget.org/packages/System.Diagnostics.DiagnosticSource/6.0.1#dependencies-body-tab). Using this version it is possible to target the same .NET frameworks as the `Cassandra.AppMetrics` project which are `netstandard2.0;net461`.
 
 **Note:** There is an alternative that uses `OpenTelemetry.Api` package to avoid code duplication, but that implies changing the minimal target framework from `net461` to `net462`. Such alternative and its drawbacks are mentioned in the section ["rationale and alternatives"](#using-opentelemetry-api-package).
@@ -183,21 +183,158 @@ public void OnSpeculativeExecution(Host host, long delay)
 }
 ```
 
+### Public API
+
+The `Builder` will include a new method named `WithTracer` that will include an `IDriverTrace` instance being passed as parameter. This method can be used by anyone to pass their tracer implementation and will be used by the extension method `AddOpenTelemetryInstrumentation()` mentioned in the previous section.
+
+```csharp
+public Builder WithTracer(IDriverTrace trace)
+{
+    _driverTracer = trace;
+    return this;
+}
+```
+
 ### Changes to Cassandra core
 
-#### Observers
+#### IRequestObserver
 
-To make the above implementation possible, it will be necessary to change the definition of the `IRequestObserver.OnRequestStart()` to include `IStatement` as a parameter.
+As the tracer implementation needs information included in `IStatement`, it will be necessary to change the definition of the `IRequestObserver.OnRequestStart()` to include it as a parameter.
 
 ```csharp
 internal interface IRequestObserver
 {
-(...)
+    (...)
 
-void OnRequestStart(IStatement statement);
+    void OnRequestStart(IStatement statement);
 
-(...)
+    (...)
 }
+```
+
+#### Composite observers and factories
+[composite]: #composite
+
+The core package includes observers that are instantiated through the configuration points in the driver, being the *Configuration* class one example:
+
+```csharp
+internal Configuration(...)
+{
+    (...)
+    
+    ObserverFactoryBuilder = observerFactoryBuilder ?? (MetricsEnabled ? (IObserverFactoryBuilder)new MetricsObserverFactoryBuilder() : new NullObserverFactoryBuilder());
+
+    (...)
+}
+```
+
+As it is necessary to have multiple observers being triggered on driver'actions, this proposal includes a composite pattern that will aggregate multiple observer instances for that work.
+
+The new composite classes will implement the interfaces `IConnectionObserver`, `IObserverFactory`, `IObserverFactoryBuilder`, `IOperationObserver`, `IRequestObserver`, as shown below:
+
+```csharp
+internal class CompositeConnectionObserver : IConnectionObserver
+{
+    private readonly IEnumerable<IConnectionObserver> observers;
+
+    public CompositeConnectionObserver(IEnumerable<IConnectionObserver> observers)
+    {
+        this.observers = observers;
+    }
+
+    (...)
+}
+```
+
+```csharp
+internal class CompositeObserverFactory : IObserverFactory
+{
+    private readonly IEnumerable<IObserverFactory> factories;
+
+    public CompositeObserverFactory(IEnumerable<IObserverFactory> factories)
+    {
+        this.factories = factories;
+    }
+    
+    (...)
+}
+```
+
+```csharp
+internal class CompositeObserverFactoryBuilder : IObserverFactoryBuilder
+{
+    private readonly IObserverFactoryBuilder[] builders;
+
+    public CompositeObserverFactoryBuilder(params IObserverFactoryBuilder[] builders)
+    {
+        this.builders = builders;
+    }
+    
+    (...)
+}
+```
+
+```csharp
+internal class CompositeOperationObserver : IOperationObserver
+{
+    private readonly IEnumerable<IOperationObserver> observers;
+
+    public CompositeOperationObserver(IEnumerable<IOperationObserver> observers)
+    {
+        this.observers = observers;
+    }
+    
+    (...)
+}
+```
+
+```csharp
+internal class CompositeRequestObserver : IRequestObserver
+{
+    private readonly IEnumerable<IRequestObserver> observers;
+
+    public CompositeRequestObserver(IEnumerable<IRequestObserver> observers)
+    {
+        this.observers = observers;
+    }
+    
+    (...)
+}
+```
+
+This composite classes, when called, will iterate through all the observer instances being passed in the constructors and will call the method of their respective observer. As an example, the method `IRequestObserver.OnRequestFinish(Exception exception)` will look like this:
+
+```csharp
+public void OnRequestFinish(Exception exception)
+{
+    foreach (var observer in this.observers)
+    {
+        observer.OnRequestFinish(exception);
+    }
+}
+```
+
+The composite observers will be instantiated in the place of the current ones and will receive a list of observers as parameter. As an example, the `ObserverFactoryBuilder` in *Configuration* class mentioned [above](#composite) will include `MetricsObserverFactoryBuilder` and `TracerObserverFactoryBuilder` as parameter of the `CompositeObserverFactoryBuilder`:
+
+```csharp
+internal Configuration(...)
+{
+    (...)
+     ObserverFactoryBuilder = new CompositeObserverFactoryBuilder(
+                new MetricsObserverFactoryBuilder(MetricsEnabled),
+                new TracerObserverFactoryBuilder(driverTracer));
+    (...)
+}
+```
+
+As it is possible to be seen, the validation to construct the `MetricsRequestObserver` will be moved to the `MetricsObserverFactoryBuilder` instead of being done in the configuration, e.g.:
+
+```csharp
+public IObserverFactory Build(IMetricsManager manager)
+{
+    return this.isEnabled ? new MetricsObserverFactory(manager) : NullObserverFactory.Instance;
+}
+
 ```
 
 #### Cassandra.Requests
