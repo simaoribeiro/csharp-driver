@@ -127,29 +127,88 @@ Similar to the existent metrics feature, this functionality includes a project n
 
 **Note:** There is an alternative that uses `OpenTelemetry.Api` package to avoid code duplication, but that implies changing the minimal target framework from `net461` to `net462`. Such alternative and its drawbacks are mentioned in the section ["rationale and alternatives"](#using-opentelemetry-api-package).
 
-### 
+### Extension methods
 
-Proposed changes to the .NET targets (.NET Standard, .NET Framework, unified .NET) that will have to be made (if any) 
+The project includes a `Builder` extension method named `AddOpenTelemetryInstrumentation` that will instantiate a new class named `Trace` which will start and populate the `System.Diagnostics.Activity` class that will have the Cassandra telemetry information.
+This new class will implement an `IDriverTrace` interface that will be included in the Cassandra core, which is a similar implementation that already exists in the `Cassandra.AppMetrics` package.
 
-New nuget dependencies
+## Cassandra core project
 
-Changes to the API of the driver
+### Tracer observers
 
-Avoid breaking changes because we are not considering a new major release any time soon.
+The tracing implementation will use the already defined factory interfaces for the creation of observer factories, so the following classes will be created:
 
-Changes to dependencies and .NET targets should be avoided. If they can’t be avoided then we can think of some possibilities like having an interface on the main driver package and then having separate extension packages that implement that interface (we did this for the metrics feature, the App.Metrics based implementation is on a separate package on the same repo).
+```csharp
+internal class TracerObserverFactoryBuilder : IObserverFactoryBuilder
+```
 
-We can also consider changing the .NET targets of the main package if they aren’t too drastic but we can have that discussion once we know for sure if we require a recent version of .NET for this work.
+```csharp
+internal class TracerObserverFactory : IObserverFactory
+```
 
-Also we’re always happy to see community contributions like this. I’ll try my best to review and comment on the document and future PR in a timely fashion.
+When instantiating the factories that will culminate in the creation if the `TracesRequestObserver`, the implementation of `IDriverTrace` will be passed as parameter. This interface will define the following methods:
 
-This is the technical portion of the RFC. Explain the design in sufficient detail that:
+```csharp
+public interface IDriverTrace
+{
+    void OnStart(IStatement statement);
 
-- Its interaction with other features is clear.
-- It is reasonably clear how the feature would be implemented.
-- Corner cases are dissected by example.
+    void OnError(Exception ex);
+}
+```
 
-The section should return to the examples given in the previous section, and explain more fully how the detailed proposal makes those examples work.
+and will be used in the `TracesRequestObserver`:
+
+```csharp
+internal class TracesRequestObserver : IRequestObserver
+
+(...)
+
+public void OnRequestError(Host host, RequestErrorType errorType, RetryDecision.RetryDecisionType decision)
+{
+}
+
+public void OnRequestFinish(Exception exception)
+{
+    _driverTrace.OnError(exception);
+}
+
+public void OnRequestStart(IStatement statement)
+{
+    _driverTrace.OnStart(statement);
+}
+
+public void OnSpeculativeExecution(Host host, long delay)
+{
+}
+```
+
+### Changes to Cassandra core
+
+#### Observers
+
+To make the above implementation possible, it will be necessary to change the definition of the `IRequestObserver.OnRequestStart()` to include `IStatement` as a parameter.
+
+```csharp
+internal interface IRequestObserver
+{
+(...)
+
+void OnRequestStart(IStatement statement);
+
+(...)
+}
+```
+
+#### Cassandra.Requests
+
+`TcsMetricsRequestResultHandler` now receives `IStatement` as a constructor parameter, so it can be passed to the updated `IRequestObserver.OnRequestStart(IStatement statement)`.
+
+As so, the instantiation of the `IRequestResultHandler` in `RequestHandler` class will also change to include the statement as parameter_
+
+```csharp
+_requestResultHandler = new TcsMetricsRequestResultHandler(_requestObserver, statement);
+```
 
 # Drawbacks
 [drawbacks]: #drawbacks
@@ -164,7 +223,7 @@ Why should we *not* do this?
 
 The OpenTelemetry repository for .NET describes [how to report Exceptions](https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/docs/trace/reporting-exceptions/README.md) in a trace. The [option 4](https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/docs/trace/reporting-exceptions/README.md#option-4---use-activityrecordexception) mentioned in the document is the preferred approach in the industry on how to record exceptions. It includes the method `RecordException()` that is available in the project `OpenTelemetry.Api` which, since version [`1.3.0`](https://www.nuget.org/packages/OpenTelemetry.Api/1.3.0), only supports the minimal version of `4.6.2` for .NET framework. Using this package in the most recent versions will imply the loss of support for .NET Framework `4.6.1`.
 
-The method [`RecordException()`](https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/src/OpenTelemetry.Api/Trace/ActivityExtensions.cs#L81) is simple enough to be replicated, and can be included in the `Cassandra.OpenTelemetry` project. As a downside, that means the Cassandra project will need to keep up with the best practices on how to report exceptions for tracing, and include code duplication. As an upside, it is possible to target .NET Framework `4.6.1`, and the reference to `OpenTelemetry.Api` is not needed which also allows the Cassandra project to not have a possible deprecated dependency depending on the evolution of reference package.
+The method [`RecordException()`](https://github.com/open-telemetry/opentelemetry-dotnet/blob/main/src/OpenTelemetry.Api/Trace/ActivityExtensions.cs#L81) is simple enough to be replicated and can be included in the `Cassandra.OpenTelemetry` project. As a downside, that means the Cassandra project will need to keep up with the best practices on how to report exceptions for tracing, and will include code duplication. As an upside, it is possible to target .NET Framework `4.6.1`, and the reference to `OpenTelemetry.Api` is not needed which also allows the Cassandra project to not have a possible deprecated dependency depending on the evolution of reference package.
 
 ## Using OpenTelemetry.SemanticConventions package
 
