@@ -20,7 +20,7 @@ Cassandra has a community developed package available in the [opentelemetry-dotn
 
 ## [Traces](https://opentelemetry.io/docs/concepts/signals/traces/)
 
-As mentioned in [*Motivation*](#motivation), traces allows the developers to understand the full "path" a request takes in the application and navigate through a microservice architecture. Traces include [Spans](https://opentelemetry.io/docs/concepts/signals/traces/#spans) which are unit of works or operation in the ecosystem that include the following information:
+As mentioned in [*Motivation*](#motivation), traces allows the developers to understand the full "path" a request takes in the application and navigate through a service. Traces include [Spans](https://opentelemetry.io/docs/concepts/signals/traces/#spans) which are unit of works or operation in the ecosystem that include the following information:
 
 - Name
 - Parent span ID (empty for root spans)
@@ -44,6 +44,7 @@ The spans can be correlated with each other and assembled into a trace using [co
 ![jaeger](./system-architecture-trace-timeline.png)
 
 ## OpenTelemetry Semantic Conventions
+[opentelemetry-semantic-conventions]: #opentelemetry-semantic-conventions
 
 ### Span name
 
@@ -61,7 +62,7 @@ To avoid parsing the statement, the **span name** in this implementation has the
 
 ### Span attributes
 
-This implementation includes, by default, the **required** attributes for Database, and Cassandra spans.\
+This implementation will include, by default, the **required** attributes for Database, and Cassandra spans.\
 `server.address` and `server.port`, despite only **recommended**, are included to give information regarding the client connection.\
 `db.statement` is optional given that this attribute may contain sensitive information:
 
@@ -78,17 +79,17 @@ This implementation includes, by default, the **required** attributes for Databa
 
 ### Package installation
 
-The OpenTelemetry implementation is included in the package `CassandraCSharpDriver.OpenTelemetry`.
+The OpenTelemetry implementation will be included in the package `CassandraCSharpDriver.OpenTelemetry`.
 
 ### Exporting Cassandra activity
 
-The extension method `AddOpenTelemetryInstrumentation()` is available in the cluster builder, so the activity can be exported for database operations:
+The extension method `AddOpenTelemetryTraceInstrumentation()` will be available in the cluster builder, so the activity can be exported for database operations:
 
 ```csharp
 var cluster = Cluster.Builder()
     .AddContactPoint("127.0.0.1")
     .WithSessionName("session-name")
-    .AddOpenTelemetryInstrumentation()
+    .AddOpenTelemetryTraceInstrumentation()
     .Build();
 ```
 
@@ -98,13 +99,13 @@ The extension method also includes the option to enable the database statement t
 var cluster = Cluster.Builder()
     .AddContactPoint("127.0.0.1")
     .WithSessionName("session-name")
-    .AddOpenTelemetryInstrumentation(options => options.SetDbStatement = true)
+    .AddOpenTelemetryTraceInstrumentation(options => options.SetDbStatement = true)
     .Build();
 ```
 
 ### Capturing Cassandra activity
 
-When setting up the tracer provider, it is necessary to include the Cassandra source for the activity to be captured. The activity source name is available in the property `CassandraInstrumentation.ActivitySourceName` that is included in the `CassandraCSharpDriver.OpenTelemetry` package.
+When setting up the tracer provider, it is necessary to include the Cassandra source for the activity to be captured. The activity source name will be available in the property `CassandraInstrumentation.ActivitySourceName` that will be included in the `CassandraCSharpDriver.OpenTelemetry` package.
 
 Example:
 
@@ -129,7 +130,7 @@ Similar to the existent metrics feature, this functionality will include a proje
 
 ### Extension methods
 
-The project will include a `Builder` extension method named `AddOpenTelemetryInstrumentation` that will instantiate a new class named `Trace` which will start and populate the `System.Diagnostics.Activity` class that will have the Cassandra telemetry information.
+The project will include a `Builder` extension method named `AddOpenTelemetryTraceInstrumentation` that will instantiate a new class named `Trace` which will start and populate the `System.Diagnostics.Activity` class that will have the Cassandra telemetry information.
 This new class will implement an `IDriverTrace` interface that will be included in the Cassandra core, which is a similar implementation that already exists in the `Cassandra.AppMetrics` package.
 
 ## Cassandra core project
@@ -185,7 +186,7 @@ public void OnSpeculativeExecution(Host host, long delay)
 
 ### Public API
 
-The `Builder` will include a new method named `WithTracer` that will include an `IDriverTrace` instance being passed as parameter. This method can be used by anyone to pass their tracer implementation and will be used by the extension method `AddOpenTelemetryInstrumentation()` mentioned in the previous section.
+The `Builder` will include a new method named `WithTracer` that will include an `IDriverTrace` instance being passed as parameter. This method can be used by anyone to pass their tracer implementation and will be used by the extension method `AddOpenTelemetryTraceInstrumentation()` mentioned in the previous section.
 
 ```csharp
 public Builder WithTracer(IDriverTrace trace)
@@ -213,7 +214,7 @@ internal interface IRequestObserver
 ```
 
 #### Composite observers and factories
-[composite]: #composite
+[composite-observers-and-factories]: #composite-observers-and-factories
 
 The core package includes observers that are instantiated through the configuration points in the driver, being the *Configuration* class one example:
 
@@ -314,7 +315,7 @@ public void OnRequestFinish(Exception exception)
 }
 ```
 
-The composite observers will be instantiated in the place of the current ones and will receive a list of observers as parameter. As an example, the `ObserverFactoryBuilder` in *Configuration* class mentioned [above](#composite) will include `MetricsObserverFactoryBuilder` and `TracerObserverFactoryBuilder` as parameter of the `CompositeObserverFactoryBuilder`:
+The composite observers will be instantiated in the place of the current ones and will receive a list of observers as parameter. As an example, the `ObserverFactoryBuilder` in *Configuration* class mentioned [above](#composite-observers-and-factories) will include `MetricsObserverFactoryBuilder` and `TracerObserverFactoryBuilder` as parameter of the `CompositeObserverFactoryBuilder`:
 
 ```csharp
 internal Configuration(...)
@@ -399,7 +400,7 @@ Cassandra also has client-side implementations in other languages in the form of
 
 ### Include missing Recommended attributes
 
-As referred in [*semantic conventions* section](#semantic-conventions), there are recommended attributes that are not included in this proposal that may be useful for the users of Cassandra telemetry and can be something to look at in the future iterations of this feature:
+As referred in [*semantic conventions* section](#opentelemetry-semantic-conventions), there are recommended attributes that are not included in this proposal that may be useful for the users of Cassandra telemetry and can be something to look at in the future iterations of this feature:
 
 - [Cassandra Call-level attributes](https://opentelemetry.io/docs/specs/semconv/database/cassandra/#call-level-attributes)
 - [Database Call-level attributes](https://opentelemetry.io/docs/specs/semconv/database/database-spans/#call-level-attributes)
