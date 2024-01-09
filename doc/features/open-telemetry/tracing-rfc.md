@@ -73,7 +73,7 @@ This implementation will include, by default, the **required** attributes for Da
 | db.name | The keyspace name in Cassandra. | string | true | *keyspace in use* |
 | db.statement | The database statement being executed. | string | false | *database statement in use* |
 | server.address | Name of the database host. | string | true | e.g.: example.com; 10.1.2.80; /tmp/my.sock |
-| server.port | Server port number. Used in case the port being used is not the default | int | false | e.g.: 9445 |
+| server.port | Server port number. Used in case the port being used is not the default. | int | false | e.g.: 9445 |
 
 ## Usage
 
@@ -229,7 +229,7 @@ internal Configuration(...)
 }
 ```
 
-As it is necessary to have multiple observers being triggered on driver'actions, this proposal includes a composite pattern that will aggregate multiple observer instances for that work.
+As it is necessary to have multiple observers being triggered on driver's actions, this proposal includes a composite pattern that will aggregate multiple observer instances for that work.
 
 The new composite classes will implement the interfaces `IConnectionObserver`, `IObserverFactory`, `IObserverFactoryBuilder`, `IOperationObserver`, `IRequestObserver`, as shown below:
 
@@ -351,8 +351,6 @@ _requestResultHandler = new TcsMetricsRequestResultHandler(_requestObserver, sta
 # Drawbacks
 [drawbacks]: #drawbacks
 
-Although the implementation suggested in this document tries to minimize changing the core package, the inclusion of new observers being called will increase the complexity and the performance of the driver.
-
 `TracesRequestObserver`, for now, doesn't have a use for the methods `OnRequestError` and `OnSpeculativeExecution` defined in the interface `IRequestObserver`. However, this can change in the future as the semantic conventions defines more attributes than the ones being included in this proposal, being some of them related to speculative execution.
 
 Another point that should be looked into is that the current observers can sometimes be metrics-focused which means that some implementations will have method definitions that are not being used. As an example, the `IObserverFactoryBuilder.Build` that is implemented by `TracerObserverFactoryBuilder` and `NullObserverFactoryBuilder` doesn't need the `IMetricsManager` instance that is passed as parameter.\
@@ -371,7 +369,7 @@ The method [`RecordException()`](https://github.com/open-telemetry/opentelemetry
 ## Using OpenTelemetry.SemanticConventions package
 
 The [semantic conventions](https://opentelemetry.io/docs/specs/semconv/) are a fast evolving reference that "define a common set of (semantic) attributes which provide meaning to data when collecting, producing and consuming it.".\
-As it changes can be hard to follow, the .NET project includes a package named [`OpenTelemetry.SemanticConventions`](https://www.nuget.org/packages/OpenTelemetry.SemanticConventions/1.0.0-rc9.9) that maps the attributes defined in the conventions to a .NET project. Using this package will allow the Cassandra project to have its tracing attributes up-to-date to the conventions with less maintenance, however, as it's still marked as non-stable (current version is `1.0.0-rc9.9`), its inclusion is not included in this proposal.
+As its changes can be hard to follow, the .NET project includes a package named [`OpenTelemetry.SemanticConventions`](https://www.nuget.org/packages/OpenTelemetry.SemanticConventions/1.0.0-rc9.9) that maps the attributes defined in the conventions to a .NET project. Using this package will allow the Cassandra project to have its tracing attributes up-to-date to the conventions with less maintenance, however, as it's still marked as non-stable (current version is `1.0.0-rc9.9`), it is not included in this proposal.
 
 # Prior art
 [prior-art]: #prior-art
@@ -391,14 +389,14 @@ Cassandra also has client-side implementations in other languages in the form of
 # Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-- TBD
+- The `IStatement` interface includes a property named [`IsTracing`](https://github.com/datastax/csharp-driver/blob/master/src/Cassandra/IStatement.cs#L53) which may be confusing with the OpenTelemetry nomenclature. Should we change part of the naming proposed in this document?
 
 # Future possibilities
 [future-possibilities]: #future-possibilities
 
 ## Traces
 
-### Include missing Recommended attributes
+### Include missing recommended attributes
 
 As referred in [*semantic conventions* section](#opentelemetry-semantic-conventions), there are recommended attributes that are not included in this proposal that may be useful for the users of Cassandra telemetry and can be something to look at in the future iterations of this feature:
 
